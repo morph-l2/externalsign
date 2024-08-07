@@ -12,6 +12,7 @@ type Result struct {
 }
 
 type Response struct {
-	Result Result `json:"result"`
-	Status int    `json:"status"`
+	Result  Result      `json:"result"`
+	Results interface{} `json:"results"`
+	Status  int         `json:"status"`
 }

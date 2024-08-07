@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
+	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
@@ -29,9 +30,8 @@ type ExternalSign struct {
 
 	// http client
 	Client *resty.Client
-	// url
-	signUrl string
-	Signer  types.Signer
+
+	Signer types.Signer
 }
 
 type BusinessData struct {
@@ -67,7 +67,7 @@ func init() {
 	log.Root().SetHandler(log.LvlFilterHandler(log.LvlDebug, logHandler))
 }
 
-func NewExternalSign(appid string, priv *rsa.PrivateKey, signUrl, addr, chain string, signer types.Signer) *ExternalSign {
+func NewExternalSign(appid string, priv *rsa.PrivateKey, addr, chain string, signer types.Signer) *ExternalSign {
 
 	// new resty.client
 	client := resty.New()
@@ -75,7 +75,6 @@ func NewExternalSign(appid string, priv *rsa.PrivateKey, signUrl, addr, chain st
 		Appid:   appid,
 		Privkey: priv,
 		Client:  client,
-		signUrl: signUrl,
 		Address: addr,
 		Chain:   chain,
 		Signer:  signer,
@@ -91,10 +90,10 @@ func (e *ExternalSign) newData(hash string) (*Data, error) {
 	}, nil
 }
 
-func (e *ExternalSign) NewGenAddrData() (*GenAddrData, error) {
+func (e *ExternalSign) NewGenAddrData() *GenAddrData {
 	return &GenAddrData{
 		Chain: e.Chain,
-	}, nil
+	}
 }
 
 func (e *ExternalSign) craftReqData(data interface{}) (*ReqData, error) {
@@ -120,14 +119,22 @@ func (e *ExternalSign) craftReqData(data interface{}) (*ReqData, error) {
 	}
 	hexSig := hex.EncodeToString(signature)
 
+	pubkey, err := GetPubKeyStr(e.Privkey)
+	if err != nil {
+		return nil, fmt.Errorf("GetPubKeyStr err:%w", err)
+	}
 	return &ReqData{
 		BusinessData: businessData,
 		BizSignature: hexSig,
+		Pubkey:       pubkey,
 	}, nil
 
 }
 
-func (e *ExternalSign) RequestSign(tx *types.Transaction) (*types.Transaction, error) {
+// request external sign
+// params: unsigned tx
+// return: signed tx
+func (e *ExternalSign) RequestSign(url string, tx *types.Transaction) (*types.Transaction, error) {
 	hashHex := e.Signer.Hash(tx).Hex()
 
 	data, err := e.newData(hashHex)
@@ -138,33 +145,10 @@ func (e *ExternalSign) RequestSign(tx *types.Transaction) (*types.Transaction, e
 	if err != nil {
 		return nil, fmt.Errorf("craft req data error:%s", err)
 	}
-	signedTx, err := e.requestSign(*reqdata, tx)
+
+	resp, err := e.doRequest(url, reqdata)
 	if err != nil {
-		return nil, fmt.Errorf("request sign error:%s", err)
-	}
-	return signedTx, nil
-}
-
-func (e *ExternalSign) requestSign(data ReqData, tx *types.Transaction) (*types.Transaction, error) {
-
-	resp, err := e.Client.R().
-		SetHeader("Content-Type", "application/json").
-		SetBody(data).
-		Post(e.signUrl)
-
-	if err != nil {
-		return nil, fmt.Errorf("request sign error: %v", err)
-	}
-
-	// log resp info
-	log.Info("request sign response",
-		"status", resp.StatusCode(),
-		"body", resp.String(),
-		// "result", result,
-	)
-
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("response status not ok: %v, resp body:%v", resp.StatusCode(), string(resp.Body()))
+		return nil, fmt.Errorf("doRequest err: %w", err)
 	}
 
 	// decode resp
@@ -180,11 +164,63 @@ func (e *ExternalSign) requestSign(data ReqData, tx *types.Transaction) (*types.
 
 	sig, err := hexutil.Decode(response.Result.SignDatas[0].Sign)
 	if err != nil {
-		return nil, fmt.Errorf("decide sig failed:%w", err)
+		return nil, fmt.Errorf("decode sig failed:%w", err)
 	}
 	signedTx, err := tx.WithSignature(e.Signer, sig)
 	if err != nil {
 		return nil, fmt.Errorf("with signature err:%w", err)
 	}
 	return signedTx, nil
+}
+
+func (e *ExternalSign) RequestWalletAddr(url string) (*common.Address, error) {
+	data := e.NewGenAddrData()
+	reqData, err := e.craftReqData(data)
+	if err != nil {
+		return nil, fmt.Errorf("craftReqData err:%w", err)
+	}
+
+	resp, err := e.doRequest(url, reqData)
+	if err != nil {
+		return nil, fmt.Errorf("doRequest err: %w", err)
+	}
+
+	// decode resp
+	response := new(Response)
+	err = json.Unmarshal(resp.Body(), response)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal resp err:%w", err)
+	}
+
+	if len(response.Result.Address) == 0 {
+		return nil, errors.New("response address empty")
+	}
+
+	addr := common.HexToAddress(response.Result.Address)
+	return &addr, nil
+}
+
+func (e *ExternalSign) doRequest(url string, payload interface{}) (*resty.Response, error) {
+
+	log.Info("req info", "payload", payload)
+
+	resp, err := e.Client.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(payload).
+		Post(url)
+
+	if err != nil {
+		return nil, fmt.Errorf("request sign error: %v", err)
+	}
+
+	// log resp info
+	log.Info("response info",
+		"status", resp.StatusCode(),
+		"body", resp.String(),
+	)
+
+	if resp.StatusCode() != http.StatusOK {
+		return nil, fmt.Errorf("response status not ok: %v, resp body:%v", resp.StatusCode(), string(resp.Body()))
+	}
+	return resp, nil
 }

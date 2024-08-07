@@ -17,7 +17,7 @@ func TestRequestSign(t *testing.T) {
 
 	appid := "morph-tx-submitter-399A1722-3F2C-4E39-ABD2-1B65D02C66BA"
 	rsaPrivStr := ""
-	signUrl := "http://localhost:8080/v1/sign/tx_sign"
+	url := "http://localhost:8080/v1/sign/tx_sign"
 	addr := "0x33d5b507868b7e8ac930cd3bde9eadd60c638479"
 	chain := "QANET-L1"
 	chainid := big.NewInt(900)
@@ -25,7 +25,7 @@ func TestRequestSign(t *testing.T) {
 
 	rsa, err := ParseRsaPrivateKey(rsaPrivStr)
 	require.NoError(t, err)
-	es := NewExternalSign(appid, rsa, signUrl, addr, chain, signer)
+	es := NewExternalSign(appid, rsa, addr, chain, signer)
 
 	// testdata
 	topk, err := crypto.GenerateKey()
@@ -47,19 +47,8 @@ func TestRequestSign(t *testing.T) {
 	for _, txdata := range txdatas {
 
 		tx := types.NewTx(txdata)
-		hashHex := signer.Hash(tx).Hex()
-		data, err := es.newData(hashHex)
+		signedTx, err := es.RequestSign(url, tx)
 		require.NoError(t, err)
-		reqData, err := es.craftReqData(*data)
-		require.NoError(t, err)
-		pubstr, err := GetPubKeyStr(rsa)
-		require.NoError(t, err)
-		reqData.Pubkey = pubstr
-		require.NoError(t, err)
-		t.Log("reqData", reqData)
-		signedTx, err := es.requestSign(*reqData, tx)
-		require.NoError(t, err)
-
 		from, err := signer.Sender(signedTx)
 		require.NoError(t, err)
 		require.Equal(t, hexutil.Encode(from.Bytes()), addr)
@@ -91,24 +80,19 @@ func TestNewWallet(t *testing.T) {
 	//test data
 	appid := "morph-tx-submitter-399A1722-3F2C-4E39-ABD2-1B65D02C66BA"
 	rsaPrivStr := ""
-	signUrl := "http://localhost:8080/v1/sign/gen_address"
+	url := "http://localhost:8080/v1/sign/gen_address"
 	chain := "QANET-L1"
 	chainid := big.NewInt(900)
 	signer := types.LatestSignerForChainID(chainid)
 
 	rsaPriv, err := ParseRsaPrivateKey(rsaPrivStr)
 	require.NoError(t, err)
-	es := NewExternalSign(appid, rsaPriv, signUrl, "", chain, signer)
-	data, err := es.NewGenAddrData()
+	es := NewExternalSign(appid, rsaPriv, "", chain, signer)
+
+	addr, err := es.RequestWalletAddr(url)
 	require.NoError(t, err)
-	reqData, err := es.craftReqData(*data)
-	require.NoError(t, err)
-	pubstr, err := GetPubKeyStr(rsaPriv)
-	require.NoError(t, err)
-	reqData.Pubkey = pubstr
-	require.NoError(t, err)
-	t.Log("reqData", reqData)
-	es.requestSign(*reqData, nil)
+	require.NotEmpty(t, addr)
+	t.Log("addr", addr)
 
 }
 
