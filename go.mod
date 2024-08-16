@@ -2,13 +2,11 @@ module github.com/morph-l2/externalsign
 
 go 1.22
 
-replace github.com/tendermint/tendermint => github.com/morph-l2/tendermint v0.2.2-beta
-
 require (
 	github.com/go-resty/resty/v2 v2.13.1
 	github.com/google/uuid v1.6.0
 	github.com/holiman/uint256 v1.2.4
-	github.com/morph-l2/go-ethereum v1.10.14-0.20240815034445-40f5783793bb
+	github.com/morph-l2/go-ethereum v0.5.0
 	github.com/stretchr/testify v1.9.0
 )
 
