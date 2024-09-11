@@ -6,7 +6,7 @@ require (
 	github.com/go-resty/resty/v2 v2.13.1
 	github.com/google/uuid v1.6.0
 	github.com/holiman/uint256 v1.2.4
-	github.com/morph-l2/go-ethereum v0.5.0
+	github.com/scroll-tech/go-ethereum v1.11.4
 	github.com/stretchr/testify v1.9.0
 )
 
@@ -43,3 +43,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
+
+replace github.com/scroll-tech/go-ethereum => github.com/morph-l2/go-ethereum v1.10.14-0.20240724022729-cdc13a3a3f11
