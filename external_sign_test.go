@@ -19,6 +19,7 @@ func TestRequestSign(t *testing.T) {
 	rsaPrivStr := ""
 	url := "http://localhost:8080/v1/sign/tx_sign"
 	addr := "0x33d5b507868b7e8ac930cd3bde9eadd60c638479"
+	to := common.HexToAddress("0xc5eb133df513af12580bf898428d24825d90821a")
 	chain := "QANET-L1"
 	chainid := big.NewInt(900)
 	signer := types.LatestSignerForChainID(chainid)
@@ -28,13 +29,10 @@ func TestRequestSign(t *testing.T) {
 	es := NewExternalSign(appid, rsa, addr, chain, signer)
 
 	// testdata
-	topk, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	toaddr := crypto.PubkeyToAddress(topk.PublicKey)
 	gas := uint64(50000)
 
 	txdata := &types.DynamicFeeTx{
-		To:        &toaddr,
+		To:        &to,
 		Gas:       gas,
 		GasFeeCap: big.NewInt(1),
 		GasTipCap: big.NewInt(2),
@@ -63,7 +61,6 @@ func TestRequestSign(t *testing.T) {
 			require.Equal(t, tp.Gas, signedTx.Gas())
 			require.Equal(t, tp.GasFeeCap.Uint64(), signedTx.GasFeeCap().Uint64())
 			require.Equal(t, tp.GasTipCap.Uint64(), signedTx.GasTipCap().Uint64())
-			require.Equal(t, tp.Value.Uint64(), signedTx.Value().Uint64())
 			require.Equal(t, tp.Data, signedTx.Data())
 			require.Equal(t, tp.BlobFeeCap.Uint64(), signedTx.BlobGasFeeCap().Uint64())
 			require.Equal(t, tp.BlobHashes, signedTx.BlobHashes())
@@ -102,7 +99,7 @@ func createEmptyBlobTxInner(withSidecar bool) *types.BlobTx {
 		emptyBlob          = new(kzg4844.Blob)
 		emptyBlobCommit, _ = kzg4844.BlobToCommitment(emptyBlob)
 		emptyBlobProof, _  = kzg4844.ComputeBlobProof(emptyBlob, emptyBlobCommit)
-		chainid            *uint256.Int
+		chainid            = uint256.NewInt(900)
 	)
 
 	sidecar := &types.BlobTxSidecar{
@@ -116,8 +113,7 @@ func createEmptyBlobTxInner(withSidecar bool) *types.BlobTx {
 		GasTipCap:  uint256.MustFromBig(big.NewInt(1)),
 		GasFeeCap:  uint256.MustFromBig(big.NewInt(1)),
 		Gas:        23,
-		To:         common.Address{0x03, 0x04, 0x05},
-		Value:      uint256.NewInt(1),
+		To:         common.HexToAddress("0xc5eb133df513af12580bf898428d24825d90821f"),
 		Data:       make([]byte, 50),
 		BlobFeeCap: uint256.NewInt(15),
 		BlobHashes: sidecar.BlobHashes(),

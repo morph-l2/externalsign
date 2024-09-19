@@ -45,6 +45,7 @@ type ReqData struct {
 	BusinessData
 	BizSignature string `json:"bizSignature"`
 	Pubkey       string `json:"publicKey"`
+	TxData       string `json:"txData"` // hex string of marshaled tx
 }
 
 type Data struct {
@@ -96,7 +97,7 @@ func (e *ExternalSign) NewGenAddrData() *GenAddrData {
 	}
 }
 
-func (e *ExternalSign) craftReqData(data interface{}) (*ReqData, error) {
+func (e *ExternalSign) craftReqData(data interface{}, txinfo string) (*ReqData, error) {
 	nonceStr := uuid.NewString()
 	dataBs, err := json.Marshal(data)
 	if err != nil {
@@ -127,6 +128,7 @@ func (e *ExternalSign) craftReqData(data interface{}) (*ReqData, error) {
 		BusinessData: businessData,
 		BizSignature: hexSig,
 		Pubkey:       pubkey,
+		TxData:       txinfo,
 	}, nil
 
 }
@@ -141,7 +143,14 @@ func (e *ExternalSign) RequestSign(url string, tx *types.Transaction) (*types.Tr
 	if err != nil {
 		return nil, fmt.Errorf("new data error:%s", err)
 	}
-	reqdata, err := e.craftReqData(*data)
+
+	// txinfo
+	txBs, err := tx.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("marshal tx failed:%w", err)
+	}
+
+	reqdata, err := e.craftReqData(*data, hex.EncodeToString(txBs))
 	if err != nil {
 		return nil, fmt.Errorf("craft req data error:%s", err)
 	}
@@ -175,7 +184,7 @@ func (e *ExternalSign) RequestSign(url string, tx *types.Transaction) (*types.Tr
 
 func (e *ExternalSign) RequestWalletAddr(url string) (*common.Address, error) {
 	data := e.NewGenAddrData()
-	reqData, err := e.craftReqData(data)
+	reqData, err := e.craftReqData(data, "")
 	if err != nil {
 		return nil, fmt.Errorf("craftReqData err:%w", err)
 	}
