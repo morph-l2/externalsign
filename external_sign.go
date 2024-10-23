@@ -8,9 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -60,12 +58,6 @@ type GenAddrData struct {
 	KeyMd5      string `json:"keyMd5"`
 	UniqId      string `json:"uniqId"`
 	Chain       string `json:"chain"`
-}
-
-func init() {
-	output := io.Writer(os.Stdout)
-	logHandler := log.StreamHandler(output, log.TerminalFormat(false))
-	log.Root().SetHandler(log.LvlFilterHandler(log.LvlDebug, logHandler))
 }
 
 func NewExternalSign(appid string, priv *rsa.PrivateKey, addr, chain string, signer types.Signer) *ExternalSign {
@@ -211,7 +203,7 @@ func (e *ExternalSign) RequestWalletAddr(url string) (*common.Address, error) {
 
 func (e *ExternalSign) doRequest(url string, payload interface{}) (*resty.Response, error) {
 
-	log.Info("req info", "payload", payload)
+	log.Trace("req info", "payload", payload)
 
 	resp, err := e.Client.R().
 		SetHeader("Content-Type", "application/json").
@@ -223,7 +215,7 @@ func (e *ExternalSign) doRequest(url string, payload interface{}) (*resty.Respon
 	}
 
 	// log resp info
-	log.Info("response info",
+	log.Trace("response info",
 		"status", resp.StatusCode(),
 		"body", resp.String(),
 	)
